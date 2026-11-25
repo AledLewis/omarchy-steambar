@@ -23,6 +23,9 @@ Panel {
   manageIpc: false
 
   property string tab: "recent"
+  // A plain open (bar click, toggle) lands in the library search, ready to
+  // type; the IPC tab/store/chat calls clear this to open where they point.
+  property bool searchOnOpen: true
   readonly property var tabOrder: ["store", "recent", "library", "friends"]
   // The Store tab's own lists, shown as sub-tabs above its rows.
   property string storeKind: "top"
@@ -719,14 +722,15 @@ Panel {
     function show(): void { root.mainInstance().open() }
     function hide(): void { var items = root.instances(); for (var i = 0; i < items.length; i++) items[i].close() }
     function toggle(): void { root.mainInstance().toggle() }
-    function tab(name: string): void { var t = root.mainInstance(); t.tab = name; t.open() }
+    function tab(name: string): void { var t = root.mainInstance(); t.searchOnOpen = false; t.tab = name; t.open() }
     function chat(account: string): void {
       var t = root.mainInstance()
       for (var i = 0; i < t.friends.length; i++)
-        if (String(t.friends[i].accountid) === account) { t.tab = "friends"; t.open(); t.openChat(t.friends[i]); return }
+        if (String(t.friends[i].accountid) === account) { t.searchOnOpen = false; t.tab = "friends"; t.open(); t.openChat(t.friends[i]); return }
     }
     function store(appid: string): void {
       var t = root.mainInstance()
+      t.searchOnOpen = false
       t.tab = "store"
       t.open()
       var list = t.storeRows.concat(t.games)
@@ -872,7 +876,7 @@ Panel {
   }
 
   onOpenedChanged: {
-    if (!opened) { armedUninstall = 0; chatFriend = null; chatMessages = []; chatSignature = ""; closeStore() }
+    if (!opened) { searchOnOpen = true; armedUninstall = 0; chatFriend = null; chatMessages = []; chatSignature = ""; closeStore() }
     if (!opened && Date.now() < reopenUntil) { reopenTimer.restart(); return }
     if (opened && reopening) { reopening = false; return }
     if (opened) {
@@ -883,6 +887,8 @@ Panel {
       actionError = ""
       cursorActive = false
       rowIndex = 0
+      if (searchOnOpen) tab = "library"
+      searchOnOpen = true
     } else if (filterText !== "") {
       filterText = ""
       filterField.text = ""
@@ -1063,7 +1069,7 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened
-    focusTarget: keyCatcher
+    focusTarget: root.tab === "library" ? filterField : keyCatcher
     // The chat and store panes widen the popup beside the list.
     contentWidth: root.listWidth + (root.chatOpen ? root.chatWidth : root.storeOpen ? root.storeWidth : 0)
     contentHeight: Style.space(500)
